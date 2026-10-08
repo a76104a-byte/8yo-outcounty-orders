@@ -70,9 +70,11 @@ async function calculateGeo(){
  let origin=storeLocations[store];
  if(!origin||!origin.verified){
  const storeQuery=store==="斗六"?"雲林縣斗六市西平路2號":"彰化縣員林市中山路一段800號";
- const found=await geoLookup(storeQuery);if(seq!==geoSeq||key!==addressKey())return;
- const match=found.find(x=>Number.isFinite(Number(x.lat))&&Number.isFinite(Number(x.lon))&&(x.score===undefined||x.score>=80)&&!["Locality","City","Subregion","Region"].includes(x.kind));
- if(!match)throw Error("無法定位門市地址（${storeQuery}），請稍後重試");
+ let found=await geoLookup(storeQuery);if(seq!==geoSeq||key!==addressKey())return;
+ if(store==="斗六"&&!found.length){found=await geoLookup("西平路2號 斗六市 雲林縣 台灣");if(seq!==geoSeq||key!==addressKey())return}
+ const valid=found.filter(x=>Number.isFinite(Number(x.lat))&&Number.isFinite(Number(x.lon))&&!["Locality","City","Subregion","Region"].includes(x.kind));
+ const match=valid.find(x=>store==="斗六"?(Number(x.lat)>23.65&&Number(x.lat)<23.78&&Number(x.lon)>120.48&&Number(x.lon)<120.62):true);
+ if(!match)throw Error("無法確認"+store+"門市座標，請稍後重試");
  origin={lat:Number(match.lat),lon:Number(match.lon),verified:true};storeLocations[store]=origin;
  }
  const candidates=await geoLookup(city+district+addr);if(seq!==geoSeq||key!==addressKey())return;
