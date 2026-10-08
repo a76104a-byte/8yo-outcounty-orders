@@ -23,7 +23,7 @@ function getPolicy(name,category){
  if(category==="極韻白")p.sugar=p.sugar.filter(x=>x!=="無糖");
  if(name==="雪匠奶茶"){p.sugar=p.sugar.filter(x=>x!=="無糖");p.ice=["固定冰度"];p.pearl=false}
  if(category==="乳酸樂多"){p.ice=["固定冰度"];p.pearl=false;p.notice="提醒：此系列含有鮮奶"}
- if(category==="ㄦㄦ益生菌"){p.ice=["固定冰度"];p.pearl=false;if(name.startsWith("好蜂ㄦㄦ")||name.startsWith("好解ㄦㄦ"))p.sugar=["固定甜度"]}
+ if(category==="ㄦㄦ益生菌"){p.ice=["固定冰度"];p.pearl=false}
  return p;
 }
 function drawMenu(){
