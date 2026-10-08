@@ -51,7 +51,15 @@ let distanceKm=null,geoKey="",geoTimer=null,geoSeq=0;
 const storeLocations={"斗六":{lat:23.7108,lon:120.5415,verified:false},"員林":null};
 function radians(n){return n*Math.PI/180}
 function kmBetween(a,b){const dl=radians(b.lat-a.lat),dn=radians(b.lon-a.lon),x=Math.sin(dl/2)**2+Math.cos(radians(a.lat))*Math.cos(radians(b.lat))*Math.sin(dn/2)**2;return 6371*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))}
-async function geoLookup(query){const url="https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=tw&q="+encodeURIComponent(query);const response=await fetch(url,{headers:{"Accept":"application/json"}});if(!response.ok)throw Error("定位服務暫時無法使用");return response.json()}
+async function geoLookup(query){
+ const services=[
+ async()=>{const u="https://geocode-api.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?f=json&SingleLine="+encodeURIComponent(query)+"&countryCode=TWN&outFields=Match_addr,Addr_type&maxLocations=5";const r=await fetch(u);if(!r.ok)throw Error("ArcGIS");const j=await r.json();return (j.candidates||[]).filter(x=>x.score>=80).map(x=>({lat:x.location.y,lon:x.location.x,display_name:x.address,score:x.score,kind:x.attributes?.Addr_type}))},
+ async()=>{const u="https://geocode-api.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?f=json&SingleLine="+encodeURIComponent(query)+"&countryCode=TWN&outFields=Match_addr,Addr_type&maxLocations=5";const r=await fetch(u);if(!r.ok)throw Error("ArcGIS");const j=await r.json();return (j.candidates||[]).filter(x=>x.score>=80).map(x=>({lat:x.location.y,lon:x.location.x,display_name:x.address,score:x.score,kind:x.attributes?.Addr_type}))},
+ async()=>{const u="https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&countrycodes=tw&q="+encodeURIComponent(query);const r=await fetch(u);if(!r.ok)throw Error("OSM");return r.json()}
+ ];
+ for(const fn of services){try{const results=await fn();if(results.length)return results}catch(e){}}
+ return [];
+}
 function addressKey(){return [$("store").value,$("city").value,$("district").value,$("address").value.trim()].join("|")}
 function invalidateDistance(){distanceKm=null;geoKey="";$("distanceResult").textContent="直線距離：待計算｜最低訂購金額：待計算";orderStatus()}
 function scheduleGeo(){invalidateDistance();clearTimeout(geoTimer);if(!$("city").value||!$("district").value||$("address").value.trim().length<4){$("geoStatus").textContent="請填寫完整縣市、鄉鎮市區、路名與門牌號碼。";return}geoTimer=setTimeout(calculateGeo,900)}
@@ -62,14 +70,14 @@ async function calculateGeo(){
  try{
  let origin=storeLocations[store];
  if(!origin||!origin.verified){
- const storeQuery=store==="斗六"?"八曜和茶 斗六 西平路2號 雲林縣":"八曜和茶 員林 彰化縣";
+ const storeQuery=store==="斗六"?"雲林縣斗六市西平路2號":"八曜和茶 員林 彰化縣";
  const found=await geoLookup(storeQuery);if(seq!==geoSeq||key!==addressKey())return;
- const match=found.find(x=>(x.display_name||"").includes(store==="斗六"?"斗六":"員林")&&(x.display_name||"").includes("八曜"));
+ const match=found.find(x=>Number.isFinite(Number(x.lat))&&Number.isFinite(Number(x.lon))&&(x.score===undefined||x.score>=85));
  if(!match)throw Error("無法確認門市精確位置，暫不提供距離估算");
  origin={lat:Number(match.lat),lon:Number(match.lon),verified:true};storeLocations[store]=origin;
  }
  const candidates=await geoLookup(city+district+addr);if(seq!==geoSeq||key!==addressKey())return;
- const match=candidates.find(x=>(x.display_name||"").includes(district)&&((x.display_name||"").includes(city.replace("臺","台"))||(x.display_name||"").includes(city)));
+ const match=candidates.find(x=>Number.isFinite(Number(x.lat))&&Number.isFinite(Number(x.lon))&&(x.score===undefined?((x.display_name||"").includes(district)):x.score>=85)&&!["Locality","City","Subregion","Region"].includes(x.kind));
  if(!match)throw Error("無法精確定位此地址，請確認路名與門牌號碼");
  const d=kmBetween(origin,{lat:Number(match.lat),lon:Number(match.lon)});
  if(!Number.isFinite(d))throw Error("無法計算距離");
